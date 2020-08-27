@@ -39,11 +39,14 @@ def make_data(dom_size, n_domains, max_obs, max_obs_size, n_traj,
         # goal = [np.random.randint(dom_size[0]), np.random.randint(dom_size[1])]
         # Generate obstacle map
         if testing:
-            path = './resources/training_maps/8x8/testing/'
+            # path = './resources/training_maps/8x8/testing/'
+            path = '/home/hussein/Desktop/git-projects/hjaafar_vin/value-iteration-networks-pb/resources/training_maps/8x8_150000/50000_uniform_seed50/'
+            mp, goal, start = open_map(dom+100000,path)
         else:
-            path = './resources/training_maps/8x8/training/'
+            # path = './resources/training_maps/8x8/training/'
+            path = "/home/hussein/Desktop/git-projects/hjaafar_vin/value-iteration-networks-pb/resources/training_maps/8x8_150000/50000_uniform_seed50/"
+            mp, goal, start = open_map(dom,path)
        
-        mp, goal, start = open_map(dom,path)
 
         mp[start[1]][start[0]] = 0 #Set the start position as freespace too
         mp[goal[1]][goal[0]] = 0 #Set the goal position as freespace too
@@ -67,7 +70,7 @@ def make_data(dom_size, n_domains, max_obs, max_obs_size, n_traj,
         # Get value prior
         value_prior = G.t_get_reward_prior()
         # Sample random trajectories to our goal
-        states_xy, states_one_hot = sample_trajectory(G, n_traj,start)
+        states_xy, states_one_hot = sample_trajectory(G, n_traj,start,gen=False)
         for i in range(n_traj):
             if len(states_xy[i]) > 1:
                 # Get optimal actions for each state
@@ -113,7 +116,7 @@ def open_map(dom,path):
         return data['grid'], data['goal'], data['agent']
 
 def main(dom_size=[8, 8],
-         n_domains=5000,
+         n_domains=100000,
          max_obs=50,
          max_obs_size=2,
          n_traj=1, #This basically uses 7 diff start positions , but you need to have that in the map or else it throws an error

@@ -19,13 +19,13 @@ import logging
 
 
 def main(config,
-         n_domains=299,
+         n_domains=3000,
          max_obs=30,
          max_obs_size=None,
          n_traj=1,
-         n_actions=8):
+         n_actions=8,gen = False):
     # Correct vs total:
-    logging.basicConfig(filename='./resources/logs/log_name.log',format='%(asctime)s-%(levelname)s:%(message)s', level=logging.INFO)
+    logging.basicConfig(filename='./resources/logs/make_100000.log',format='%(asctime)s-%(levelname)s:%(message)s', level=logging.INFO)
     correct, total = 0.0, 0.0
     # Automatic swith of GPU mode if available
     use_GPU = torch.cuda.is_available()
@@ -40,31 +40,36 @@ def main(config,
     global data
     data = []
     for dom in range(n_domains):
-        # Randomly select goal position
-        # goal = [
-        #     np.random.randint(config.imsize),
-        #     np.random.randint(config.imsize)
-        # ]
-        # Generate obstacle map
-        path = './resources/maps/'
-        mp, goal, start = open_map(dom,path)
+        if gen:
+            goal = [
+            np.random.randint(config.imsize),
+            np.random.randint(config.imsize)
+            ]   
+            obs = obstacles([config.imsize, config.imsize], goal, max_obs_size)
+            # Add obstacles to map
+            n_obs = obs.add_n_rand_obs(max_obs)
+            # Add border to map
+            border_res = obs.add_border()
+            # Ensure we have valid map
+            if n_obs == 0 or not border_res:
+                continue
+            start = None
+        else:
+            path = './resources/maps/'
+            mp, goal, start = open_map(dom,path)
+            # path = './maps/8_data_300'
+            # mp, goal, start = open_map_list(dom,path)
+            mp[start[1]][start[0]] = 0 #Set the start position as freespace too
+            mp[goal[1]][goal[0]] = 0 #Set the goal position as freespace too
 
-        mp[start[1]][start[0]] = 0 #Set the start position as freespace too
-        mp[goal[1]][goal[0]] = 0 #Set the goal position as freespace too
-
-        goal = [goal[1],goal[0]] #swap them around, for the row col format (x = col not row)
-        start = [start[1],start[0]]
-        obs = obstacles([config.imsize, config.imsize], goal, max_obs_size)
-        obs.dom = mp
+            goal = [goal[1],goal[0]] #swap them around, for the row col format (x = col not row)
+            start = [start[1],start[0]]
+            obs = obstacles([config.imsize, config.imsize], goal, max_obs_size)
+            obs.dom = mp
+        
         # Get final map
         im = obs.get_final()
-        # Add obstacles to map
-        # n_obs = obs.add_n_rand_obs(max_obs)
-        # Add border to map
-        # border_res = obs.add_border()
-        # Ensure we have valid map
-        # if n_obs == 0 or not border_res:
-        #     continue
+
 
         #1 is obstacles. 
         #set obs.dom as the mp
@@ -75,8 +80,11 @@ def main(config,
         # Get value prior
         value_prior = G.get_reward_prior()
         # Sample random trajectories to our goal
-        states_xy, states_one_hot = sample_trajectory(G, n_traj,start) #dijkstra trajectory 
-        # save_image(G.image,(goal[0],goal[1]),start,states_xy, states_one_hot,counter) #this saves the maps 
+        states_xy, states_one_hot = sample_trajectory(G, n_traj,start,gen) #dijkstra trajectory 
+        print('states_xy', states_xy[0] , len(states_xy[0]))
+        if gen and len(states_xy[0]) > 0:
+            save_image(G.image,(goal[0],goal[1]),states_xy[0][0],states_xy, states_one_hot,counter) #this saves the maps 
+        
         counter += 1 
         for i in range(n_traj):
             if len(states_xy[i]) > 1:
@@ -170,39 +178,50 @@ def visualize(dom, states_xy, pred_traj):
 
 
 def save_image(im, goal, start,states_xy,states_one_hot,counter):
+    '''
+    Saves the data made by generator as jsons. 
+    '''
     s = config.imsize
 
     if len(states_xy[0]) == 0:
 
-        start_x = random.randint(0,7)
-        start_y = random.randint(0,7)
         im.tolist()[start_x][start_y] = 1
         start_xy = [0,0]
         mp = {
         'grid': im.tolist(),
         'goal': [goal[0],goal[1]],
         # 'start': int(start),
-        'start': start_xy,
-        'states_xy': states_xy[0].tolist(),
-        'states_one_hot': states_one_hot[0].tolist()}
+        'agent': start_xy}
+        # 'states_xy': states_xy[0].tolist(),
+        # 'states_one_hot': states_one_hot[0].tolist()
     else:
         mp = {
             'grid': im.tolist(),
             'goal': [goal[0],goal[1]],
             # 'start': int(start),
-            'start': states_xy[0][0].tolist(),
-            'states_xy': states_xy[0].tolist(),
-            'states_one_hot': states_one_hot[0].tolist()   
+            'agent': states_xy[0][0].tolist()
+            # 'states_xy': states_xy[0].tolist(),
+            # 'states_one_hot': states_one_hot[0].tolist()   
     }
     data.append(mp)
-    with open('./maps/' +str(s) + '_data2' +  '.json', 'w') as outfile:
+    with open('./maps/' +str(s) + '_data_300' +  '.json', 'w') as outfile:
         json.dump(data,outfile)
 
 def open_map(dom,path):
+    '''
+    Used to open a map json given dom and path, returns grid, goal and agent
+    '''
     with open(str(path) + str(dom) +'.json') as json_file:
         data = json.load(json_file)
         logging.info('Opening file: ' + str(path) + str(dom) + '.json' )
         return data['grid'], data['goal'], data['agent']
+
+def open_map_list(dom,path):
+    with open(str(path) + '.json') as json_file:
+        data = json.load(json_file)
+        logging.info('Opening file: ' + str(path) + str(dom) + '.json' )
+        return data[dom]['grid'], data[dom]['goal'], data[dom]['agent']
+
 
 if __name__ == '__main__':
     # Parsing training parameters
@@ -210,9 +229,10 @@ if __name__ == '__main__':
     parser.add_argument(
         '--weights',
         type=str,
-        default='trained/vin_8x8.pth',
+        default='trained/100000_new_vin_8x8.pth',
         help='Path to trained weights')
     parser.add_argument('--plot', action='store_true', default=False)
+    parser.add_argument('--gen', action='store_true', default=False)
     parser.add_argument('--imsize', type=int, default=8, help='Size of image')
     parser.add_argument(
         '--k', type=int, default=10, help='Number of Value Iterations')

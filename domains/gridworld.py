@@ -380,7 +380,7 @@ def trace_path(pred, source, target):
     return path
 
 
-def sample_trajectory(M, n_states,start): #Everything here, find agent (start ... source etc. )
+def sample_trajectory(M, n_states,start,gen=False): #Everything here, find agent (start ... source etc. )
     # Samples trajectories from random nodes
     #  in our domain (M)
     G, W = M.get_graph_inv()
@@ -397,10 +397,11 @@ def sample_trajectory(M, n_states,start): #Everything here, find agent (start ..
     states = []
     states_xy = []
     states_one_hot = []
-    start_x = start[0]
-    start_y = start[1]
 
-    init_states = [M.map_ind_to_state(start_x,start_y)] #Because the goal and agent I provide are in the form
+    if not gen:
+        start_x = start[0]
+        start_y = start[1]
+        init_states = [M.map_ind_to_state(start_x,start_y)] #Because the goal and agent I provide are in the form
     #x and y, but in terms of row, and col , it would be x = col and y = row 
 
     # Get optimal path from graph
