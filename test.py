@@ -4,7 +4,6 @@ import json
 import matplotlib.pyplot as plt
 import random
 import numpy as np
-
 import torch
 from torch.autograd import Variable
 
@@ -16,7 +15,8 @@ from domains.gridworld import *
 from generators.obstacle_gen import *
 
 import logging
-
+import time
+import math
 
 def main(config,
          n_domains=3000,
@@ -25,7 +25,7 @@ def main(config,
          n_traj=1,
          n_actions=8,gen = False):
     # Correct vs total:
-    logging.basicConfig(filename='./resources/logs/make_100000.log',format='%(asctime)s-%(levelname)s:%(message)s', level=logging.INFO)
+    logging.basicConfig(filename='./resources/logs/test_dev.log',format='%(asctime)s-%(levelname)s:%(message)s', level=logging.INFO)
     correct, total = 0.0, 0.0
     # Automatic swith of GPU mode if available
     use_GPU = torch.cuda.is_available()
@@ -36,9 +36,14 @@ def main(config,
     # Use GPU if available
     if use_GPU:
         vin = vin.cuda()
-    counter = 0
+    counter,total_no_soln = 0,0
     global data
     data = []
+    t_list = []
+    total_dev_non_rel, total_dev_rel = 0.0,0.0
+    total_dist, total_astar_dist = 0.0,0.0
+    metrics = True #this enables displaying the distance left to reach goal upon a failure 
+    dist_remain_avg = 0.0
     for dom in range(n_domains):
         if gen:
             goal = [
@@ -55,7 +60,9 @@ def main(config,
                 continue
             start = None
         else:
-            path = './resources/maps/'
+            wpn = True
+            # path = './resources/maps/'
+            path = '/home/hussein/Desktop/PathBench_git/PathBench/src/resources/vin_maps/8x8_newest_testing/jsons/'
             mp, goal, start = open_map(dom,path)
             # path = './maps/8_data_300'
             # mp, goal, start = open_map_list(dom,path)
@@ -81,11 +88,12 @@ def main(config,
         value_prior = G.get_reward_prior()
         # Sample random trajectories to our goal
         states_xy, states_one_hot = sample_trajectory(G, n_traj,start,gen) #dijkstra trajectory 
-        print('states_xy', states_xy[0] , len(states_xy[0]))
+        # print('states_xy', states_xy[0] , len(states_xy[0]))
         if gen and len(states_xy[0]) > 0:
             save_image(G.image,(goal[0],goal[1]),states_xy[0][0],states_xy, states_one_hot,counter) #this saves the maps 
         
-        counter += 1 
+        counter += 1
+        t0 = time.time()
         for i in range(n_traj):
             if len(states_xy[i]) > 1:
 
@@ -144,15 +152,42 @@ def main(config,
                 if pred_traj[-1, 0] == goal[0] and pred_traj[-1, 1] == goal[1]:
                     logging.debug('#################### - Path Found map %s!\n', dom)
                     correct += 1
+                    t1 = time.time()
+                    t_list.append(t1-t0)
+                    dev_rel,dev_non_rel,dist,astar_dist = deviation(states_xy[i],pred_traj,goal,total)
+                    total_dev_rel += dev_rel
+                    total_dev_non_rel += dev_non_rel
+                    total_dist += dist
+                    total_astar_dist += astar_dist
+                    if config.plot == True:
+                        visualize(G.image.T, states_xy[i], pred_traj)
+                elif metrics:
+                    d = dist_left(pred_traj,goal)
+                    dist_remain_avg += d
+                    if config.plot == True:
+                        visualize(G.image.T, states_xy[i], pred_traj)
                 total += 1
-                if config.plot == True:
-                    visualize(G.image.T, states_xy[i], pred_traj)
+
+
+
+            elif wpn:
+                total_no_soln += 1
         sys.stdout.write("\r" + str(int(
             (float(dom) / n_domains) * 100.0)) + "%")
         sys.stdout.flush()
+
     sys.stdout.write("\n")
     if total and correct:
         logging.info('Rollout Accuracy: %s',(100 * (correct / total)))
+        logging.info('Rollout Accuracy Adjusted: %s',(100 * (correct / (total+total_no_soln))))
+        logging.info('Total maps with no soln from Dijkstra %s', total_no_soln)
+        logging.info('Total avg Rel Deviation %s', (total_dev_rel/total))
+        logging.info('Total avg Non-Rel Deviation %s', (total_dev_non_rel/total))
+        logging.info('Total avg VIN Distance %s', (total_dist/total))
+        logging.info('Total avg Dijkstra Distance %s', (total_astar_dist/total))
+        logging.info('Avg deviation from Dijkstra: %s', ((((total_astar_dist/total))-((total_dist/total)))/((total_astar_dist/total))))
+        logging.info('Total elapsed time %s', (sum(t_list)/(total))) #TODO: Possibly add total no soln
+        logging.info('Avg distance left when failed: %s ', (dist_remain_avg/total) )
         logging.info('---------------------------------Done ------------------------------------')
 
     else:
@@ -221,6 +256,54 @@ def open_map_list(dom,path):
         data = json.load(json_file)
         logging.info('Opening file: ' + str(path) + str(dom) + '.json' )
         return data[dom]['grid'], data[dom]['goal'], data[dom]['agent']
+
+def deviation(optimal_path, pred_path,goal, map_num):
+    optimal_path = np.array(optimal_path)
+    optimal_path = 1.0 * optimal_path
+
+    optimal_path_x = np.array(optimal_path[:,0])
+    optimal_path_y = np.array(optimal_path[:,1])
+
+    pred_path = np.unique(pred_path, axis=0) #removes duplicates at the end (when it reaches goal)
+
+    #print('Shortened path' , pred_path)
+    pred_path_x = np.array(pred_path[:,0])
+    pred_path_y = np.array(pred_path[:,1])
+    dist = 0.0
+    astar_dist = 0.0
+    prev = pred_path[0,:]
+    total_diff_gen = 0
+    for xy in pred_path[:,:]:
+
+        diff = math.sqrt( ((1.0 * xy[0]- 1.0*prev[0])**2)+((1.0*xy[1] - 1.0*prev[1])**2))
+        total_diff_gen += diff
+        dist+= ((xy[0]-prev[0])**2 + (xy[1]-prev[1])**2)**0.5
+        prev = xy 
+
+    #prev = [0,0]
+    #print('opt', optimal_path[0,:])
+    prev = optimal_path[0,:]
+    total_diff_optim = 0
+    for xy in optimal_path[:,:]:
+        # print('xy', xy)
+        diff2 = math.sqrt( ((1.0 * xy[0]- 1.0*prev[0])**2)+((1.0*xy[1] - 1.0*prev[1])**2))
+        total_diff_optim += diff2
+        astar_dist+= ((xy[0]-prev[0])**2 + (xy[1]-prev[1])**2)**0.5
+        prev = xy 
+    
+    dev_non_rel = abs(total_diff_optim-total_diff_gen)
+    dev_rel = dev_non_rel/total_diff_optim #TODO: Add avg distance of gen trajectory
+    return(dev_rel,dev_non_rel,dist,astar_dist)
+
+def dist_left(pred_traj, goal):
+    '''
+    Finds the distance left between the point and the goal
+    '''
+    pred_traj = np.array(pred_traj) #euclidean distance or geometric distance ? use geometric
+    x1,y1 = pred_traj[-1][0], pred_traj[-1][1]
+    x2,y2 = goal[0],goal[1]
+    dist = (((x2-x1)**2 + (y2-y1)**2))**0.5
+    return dist        
 
 
 if __name__ == '__main__':

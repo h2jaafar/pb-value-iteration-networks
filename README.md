@@ -126,6 +126,16 @@ the algorithm).
 Logs are saved in `resources>logs`. You can change the logging behaviour (debug vs info) in `test_pb.py`. Ensure logs don't overwrite eachother by changing the name at each run. 
 
 ### Sample Maps: 
+Block Map:
+
+ <img src="results/8x8_1.png" width="450"> 
+
+Uniform Random Fill Map
+<img src="results/8x8_2.png" width="450">
+
+House Map
+
+<img src="results/8x8_3.png" width="450">
 
 ### Training
 WIP

@@ -84,7 +84,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--datafile',
         type=str,
-        default='dataset/new_gridworld_8x8.npz',
+        default='dataset/30000_new_gridworld_8x8.npz',
         help='Path to data file')
     parser.add_argument('--imsize', type=int, default=8, help='Size of image')
     parser.add_argument(
@@ -112,7 +112,7 @@ if __name__ == '__main__':
         '--batch_size', type=int, default=128, help='Batch size')
     config = parser.parse_args()
     # Get path to save trained model
-    save_path = "trained/100000_new_vin_{0}x{0}.pth".format(config.imsize)
+    save_path = "trained/30000_new_vin_{0}x{0}.pth".format(config.imsize)
     # Instantiate a VIN model
     net = VIN(config)
     # Loss
