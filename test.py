@@ -187,7 +187,7 @@ def main(config,
         logging.info('Total avg Dijkstra Distance %s', (total_astar_dist/total))
         logging.info('Avg deviation from Dijkstra: %s', ((((total_astar_dist/total))-((total_dist/total)))/((total_astar_dist/total))))
         logging.info('Total elapsed time %s', (sum(t_list)/(total))) #TODO: Possibly add total no soln
-        logging.info('Avg distance left when failed: %s ', (dist_remain_avg/total) )
+        logging.info('Avg distance left when failed: %s ', (dist_remain_avg/(total-correct)) )
         logging.info('---------------------------------Done ------------------------------------')
 
     else:
