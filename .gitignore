@@ -115,9 +115,21 @@ vin_my_implementation.code-workspace
 
 .vscode/launch.json
 /resources/training_maps/
+/resources/testing_maps/
+
 /resources/logs/
 /resources/test_maps/
+/resources/16_100k/
+/resources/16_60k/
+/resources/16_60k_pt2/
+
+/resources/house_expo/
+/resources/house_expo_old/
+/resources/house_expo_100x100/
 
 
 
 
+
+
+resources/100k_no_block.tar.gz

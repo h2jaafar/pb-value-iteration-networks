@@ -25,7 +25,7 @@ def main(config,
          n_traj=1,
          n_actions=8,gen = False):
     # Correct vs total:
-    logging.basicConfig(filename='./resources/logs/test_dev.log',format='%(asctime)s-%(levelname)s:%(message)s', level=logging.INFO)
+    logging.basicConfig(filename='./resources/logs/30k_16_no_block.log',format='%(asctime)s-%(levelname)s:%(message)s', level=logging.INFO)
     correct, total = 0.0, 0.0
     # Automatic swith of GPU mode if available
     use_GPU = torch.cuda.is_available()
@@ -62,7 +62,7 @@ def main(config,
         else:
             wpn = True
             # path = './resources/maps/'
-            path = '/home/hussein/Desktop/PathBench_git/PathBench/src/resources/vin_maps/8x8_newest_testing/jsons/'
+            path = './resources/testing_maps/16x16/'
             mp, goal, start = open_map(dom,path)
             # path = './maps/8_data_300'
             # mp, goal, start = open_map_list(dom,path)

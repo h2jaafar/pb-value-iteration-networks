@@ -2,6 +2,7 @@ import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import dijkstra
 import logging
+import gc
 
 
 class gridworld:
@@ -39,20 +40,21 @@ class gridworld:
         self.n_states = n_states
         self.n_actions = n_actions
 
-        p_n = np.zeros((self.n_states, self.n_states))
-        p_s = np.zeros((self.n_states, self.n_states))
-        p_e = np.zeros((self.n_states, self.n_states))
-        p_w = np.zeros((self.n_states, self.n_states))
-        p_ne = np.zeros((self.n_states, self.n_states))
-        p_nw = np.zeros((self.n_states, self.n_states))
-        p_se = np.zeros((self.n_states, self.n_states))
-        p_sw = np.zeros((self.n_states, self.n_states))
+        p_n = np.zeros((self.n_states, self.n_states),np.int8)
+        p_s = np.zeros((self.n_states, self.n_states),np.int8)
+        p_e = np.zeros((self.n_states, self.n_states),np.int8)
+        p_w = np.zeros((self.n_states, self.n_states),np.int8)
+        p_ne = np.zeros((self.n_states, self.n_states),np.int8)
+        p_nw = np.zeros((self.n_states, self.n_states),np.int8)
+        p_se = np.zeros((self.n_states, self.n_states),np.int8)
+        p_sw = np.zeros((self.n_states, self.n_states),np.int8)
 
         R = -1 * np.ones((self.n_states, self.n_actions))
         R[:, 4:self.n_actions] = R[:, 4:self.n_actions] * np.sqrt(2)
         target = np.ravel_multi_index(
             [self.targetx, self.targety], (self.n_row, self.n_col), order='F')
         R[target, :] = 0
+
 
         for row in range(0, self.n_row):
             for col in range(0, self.n_col):
@@ -82,17 +84,34 @@ class gridworld:
                 p_sw[curpos, neighbor_inds[
                     7]] = p_sw[curpos, neighbor_inds[7]] + 1
 
-        G = np.logical_or.reduce((p_n, p_s, p_e, p_w, p_ne, p_nw, p_se, p_sw))
+        #NSEW bool matrix
+        Q_1 = np.logical_or.reduce((p_n, p_s))
+        Q_1 = np.logical_or.reduce((Q_1, p_e))
+        Q_1 = np.logical_or.reduce((Q_1, p_w))
+        #Those were all the N-S-E-W matrix
+        # Now for the diagonal matrix (ne, nw, se, sw)
+        Q_rt2 = np.logical_or.reduce((p_nw, p_ne))
+        Q_rt2 = np.logical_or.reduce((Q_rt2, p_se))
+        Q_rt2 = np.logical_or.reduce((Q_rt2, p_sw))
 
-        W = np.maximum(
-            np.maximum(
-                np.maximum(
-                    np.maximum(
-                        np.maximum(np.maximum(np.maximum(p_n, p_s), p_e), p_w),
-                        np.sqrt(2) * p_ne),
-                    np.sqrt(2) * p_nw),
-                np.sqrt(2) * p_se),
-            np.sqrt(2) * p_sw)
+        #Now combine the two
+        G = np.logical_or.reduce((Q_1,Q_rt2)) #This one is G like before
+        gc.collect()
+        # combines the diagonals and the vertical-horizontals
+        #This is the array with true replaced with 1
+        W= np.array(Q_1, dtype=np.float32)
+        W_rt2 = np.array(Q_rt2, dtype=np.float32)
+        # W_and = np.logical_and.reduce((W_1, W_rt2))
+
+        #This will remove all common obstacles 
+        W+= - W_rt2
+        W = np.clip(W,0,1) #This will remove all negative 1 from the interesected ones
+        # So the resulting matrix will have the intersected portions removed.
+        W_rt2 *= np.sqrt(2)
+        # W_1 = W_1 - W_and
+        #combine both
+        W += W_rt2
+        print(W)
 
         non_obstacles = np.ravel_multi_index(
             [self.freespace[0], self.freespace[1]], (self.n_row, self.n_col),
